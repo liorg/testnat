@@ -1,0 +1,2644 @@
+{
+  "info": {
+    "name": "Cloud API — Meta + whqueue",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "אוסף אחד לכל מה שצריך לבדוק ידנית. ארבע התיקיות הראשונות הן הסדר שבו בודקים טלפון cloudapi חדש:\n\n| | |\n|---|---|\n| **1** | מה רשום ב-Meta — webhook, מנוי, זהות |\n| **2** | שליחת תבנית ל-Meta |\n| **3** | שליחת הודעה ל-Meta |\n| **4** | הודעת דמו ל-whqueue — smoke כמו מטא |\n| 5–7 | רישום, אבטחה, ה-override, וגלגול אחורה |\n\n**מלא את ה-environment** (`cloudapi.postman_environment.json`) לפני הרצה.\n\nתיקיות 2 ו-3 שולחות **הודעות אמיתיות** עם טוקן אמיתי. תיקייה 4 לא נוגעת במטא בכלל — היא מחליפה אותה."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://whqueue.grossman.bot"
+    },
+    {
+      "key": "whqueue_base",
+      "value": "https://whqueue.grossman.bot"
+    },
+    {
+      "key": "graph",
+      "value": "https://graph.facebook.com/v21.0"
+    },
+    {
+      "key": "container_url",
+      "value": ""
+    },
+    {
+      "key": "token_version",
+      "value": "1"
+    },
+    {
+      "key": "phone_id",
+      "value": ""
+    },
+    {
+      "key": "waba_id",
+      "value": ""
+    },
+    {
+      "key": "phone_number_id",
+      "value": ""
+    },
+    {
+      "key": "display_number",
+      "value": ""
+    },
+    {
+      "key": "from_number",
+      "value": ""
+    },
+    {
+      "key": "to_number",
+      "value": ""
+    },
+    {
+      "key": "template_name",
+      "value": ""
+    },
+    {
+      "key": "template_lang",
+      "value": "he"
+    },
+    {
+      "key": "verify_token",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "master_secret",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "app_secret",
+      "value": ""
+    },
+    {
+      "key": "media_id",
+      "value": ""
+    },
+    {
+      "key": "media_download_url",
+      "value": ""
+    },
+    {
+      "key": "last_wamid",
+      "value": ""
+    },
+    {
+      "key": "last_inbound_wamid",
+      "value": ""
+    },
+    {
+      "key": "current_override",
+      "value": ""
+    },
+    {
+      "key": "inbound_before",
+      "value": "0"
+    },
+    {
+      "key": "reported_before",
+      "value": "0"
+    },
+    {
+      "key": "allow_rollback",
+      "value": "0"
+    },
+    {
+      "key": "testnat_url",
+      "value": ""
+    },
+    {
+      "key": "testnat_seen_before",
+      "value": "0"
+    },
+    {
+      "key": "testnat_wamid",
+      "value": ""
+    },
+    {
+      "key": "testnat_pnid",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · מה רשום ב-Meta",
+      "description": "קריאה בלבד — לא משנה כלום. הסעיף הראשון הוא החשוב: `webhook_configuration` אומר לאיזו כתובת מטא שולחת את ההודעות של המספר הזה.\n\nמה שצריך לראות:\n\n```\nphone_number             {{whqueue_base}}/wa      ← ה-override שלנו\napplication              wh.grossman.bot/…        ← ה-webhook של הלקוח\nsubscribed_apps          מנוי, בלי override\n```\n\n`phone_number` ריק פירושו שה-override לא נכנס — ההודעות הולכות ל-webhook של האפליקציה, ו-whqueue לא רואה כלום.",
+      "item": [
+        {
+          "name": "1.1 · webhook של המספר — לאן מטא שולחת",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}?fields=webhook_configuration",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "webhook_configuration"
+                }
+              ]
+            },
+            "description": "מה שמטא מחזיקה לפני שנוגעים. נשמר ל-current_override כדי שתדע למה לחזור."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const wanted = pm.environment.get('whqueue_base') + '/wa';",
+                  "const cfg = j.webhook_configuration || {};",
+                  "const cb = cfg.phone_number || '(none — falls back to the app-level webhook)';",
+                  "console.log('phone override now:', cb);",
+                  "console.log('application-level  :', cfg.application || '(none)');",
+                  "pm.collectionVariables.set('current_override', cfg.phone_number || '');",
+                  "if (cb === wanted) console.log('כבר מצביע ל-whqueue');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2 · המנוי ל-WABA — ובלי override",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{waba_id}}/subscribed_apps",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{waba_id}}",
+                "subscribed_apps"
+              ]
+            },
+            "description": "שתי טענות: האפליקציה מנויה (אחרת מטא לא שולחת כלום), ו**אין** override ברמת ה-WABA (אחרת אירועי התבניות יגיעו ל-whqueue ולא ל-webhook של האפליקציה, ששם הם מטופלים)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const apps = j.data || [];",
+                  "pm.test('האפליקציה מנויה ל-WABA', () => pm.expect(apps.length).to.be.above(0));",
+                  "let uri = '';",
+                  "for (const a of apps) {",
+                  "  uri = a.override_callback_uri || (a.whatsapp_business_api_data || {}).override_callback_uri || uri;",
+                  "}",
+                  "console.log('waba override:', uri || '(none — as it should be)');",
+                  "pm.test('אין override על ה-WABA', () => pm.expect(uri).to.be.empty);",
+                  "if (uri) console.error('override על ה-WABA מפנה את אירועי התבניות ל-whqueue, ושם אין מי שיטפל בהם');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3 · המספר — מי הוא ומה הדירוג שלו",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}?fields=display_phone_number,verified_name,quality_rating,platform_type,code_verification_status",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "display_phone_number,verified_name,quality_rating,platform_type,code_verification_status"
+                }
+              ]
+            },
+            "description": "בדיוק הקריאה ש-_probe עושה. 401/403 = טוקן לא תקף, 404 = phone_number_id שגוי."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('the number resolves', () => {",
+                  "  pm.expect(j.display_phone_number).to.be.a('string');",
+                  "});",
+                  "",
+                  "// זה המספר שיגיע ל-phones.number. מנורמל לספרות בלבד בקונטיינר.",
+                  "const digits = (j.display_phone_number || '').replace(/\\D/g, '');",
+                  "pm.collectionVariables.set('display_digits', digits);",
+                  "console.log('display:', j.display_phone_number, '→ normalized:', digits);",
+                  "console.log('quality:', j.quality_rating, '| verified name:', j.verified_name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.4 · הטוקן — הרשאות ותפוגה",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/debug_token?input_token={{access_token}}&access_token={{access_token}}",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "debug_token"
+              ],
+              "query": [
+                {
+                  "key": "input_token",
+                  "value": "{{access_token}}"
+                },
+                {
+                  "key": "access_token",
+                  "value": "{{access_token}}"
+                }
+              ]
+            },
+            "description": "System User token אמור להחזיר `expires_at: 0` — בלי תפוגה. מספר אחר פירושו שהטוקן יפוג ויפיל את הטלפון.\n\nexpires_at שאינו 0 = טוקן זמני. הוא יפוג והקונטיינר יעבור ל-disconnected בלי סיבה נראית לעין."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = j.data || {};",
+                  "pm.test('token is valid', () => pm.expect(d.is_valid).to.be.true);",
+                  "pm.test('never expires (system user)', () => {",
+                  "  pm.expect(d.expires_at, 'expires_at should be 0 for a permanent token').to.eql(0);",
+                  "});",
+                  "console.log('type:', d.type, '| app:', d.app_id, '| scopes:', (d.scopes || []).join(','));",
+                  "if (d.expires_at) console.warn('token expires at', new Date(d.expires_at * 1000).toISOString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5 · כל המספרים ב-WABA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{waba_id}}/phone_numbers",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{waba_id}}",
+                "phone_numbers"
+              ]
+            },
+            "description": "כאן מוצאים את ה-phone_number_id הנכון להזין בוויזארד."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const ids = (j.data || []).map(p => p.id + ' → ' + p.display_phone_number);",
+                  "console.log('numbers on this WABA:\\n' + ids.join('\\n'));",
+                  "pm.test('our phone_number_id belongs to this WABA', () => {",
+                  "  const mine = (pm.environment.get('phone_number_id') || pm.collectionVariables.get('phone_number_id'));",
+                  "  pm.expect((j.data || []).some(p => p.id === mine)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · שליחת תבנית ל-Meta",
+      "description": "תבנית נשלחת בשם ובשפה, ומטא מרנדרת אותה — לא שולחים טקסט מוכן. הפרמטרים הם `components`, לפי הסדר.\n\n**הרץ 2.1 קודם** כדי לראות אילו תבניות מאושרות ומה השם המדויק שלהן; שם שאינו קיים או שאינו `APPROVED` מחזיר 132001.\n\n⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.",
+      "item": [
+        {
+          "name": "2.1 · הקטלוג — מה מאושר ומה השם המדויק",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{waba_id}}/message_templates?limit=100&fields=name,language,status,category,components",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{waba_id}}",
+                "message_templates"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                },
+                {
+                  "key": "fields",
+                  "value": "name,language,status,category,components"
+                }
+              ]
+            },
+            "description": "זו גם הקריאה שה-poller עושה כל 5 דקות, דרך ה-Manager. תבנית שנוצרה ב-Business Manager מופיעה כאן, וה-poll ייבא אותה.\n\nהקטלוג המאושר. רק APPROVED ניתן לשליחה."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const rows = (j.data || []).map(t => `${t.status.padEnd(10)} ${t.name} / ${t.language}`);",
+                  "console.log('templates:\\n' + rows.join('\\n'));",
+                  "",
+                  "// כפתורי quick_reply — אלה שדורשים payload בזמן שליחה",
+                  "(j.data || []).forEach(t => {",
+                  "  const btns = (t.components || []).find(c => c.type === 'BUTTONS');",
+                  "  if (btns) console.log(t.name, 'buttons:', JSON.stringify(btns.buttons));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2 · שליחת תבנית",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}/messages",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}",
+                "messages"
+              ]
+            },
+            "description": "⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.\n\nמסלול היזום היחיד שמותר מחוץ לחלון 24 השעות. הסר את רכיבי הפרמטרים אם התבנית בלי {{1}}.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{to_number}}\",\n  \"type\": \"template\",\n  \"template\": {\n    \"name\": \"{{template_name}}\",\n    \"language\": {\n      \"code\": \"{{template_lang}}\"\n    },\n    \"components\": [\n      {\n        \"type\": \"body\",\n        \"parameters\": [\n          {\n            \"type\": \"text\",\n            \"text\": \"דני\"\n          }\n        ]\n      },\n      {\n        \"type\": \"button\",\n        \"sub_type\": \"quick_reply\",\n        \"index\": \"0\",\n        \"parameters\": [\n          {\n            \"type\": \"payload\",\n            \"payload\": \"btn_1\"\n          }\n        ]\n      }\n    ]\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// דילוג נקי כשהמשתנה לא מולא, כדי ש-Run collection לא ייפול על זה",
+                  "const v = pm.environment.get('template_name') || pm.collectionVariables.get('template_name');",
+                  "if (!v) {",
+                  "  console.warn('דולג — אין template_name. הרץ קודם את 2.1.');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "console.log('wamid:', ((j.messages || [])[0] || {}).id);",
+                  "",
+                  "// רכיב ה-button הוא מה שגורם ללחיצה לחזור עם payload=btn_1.",
+                  "// בלעדיו buttonId יגיע ריק ל-messages.content."
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · שליחת הודעה ל-Meta",
+      "description": "שליחה ישירה ל-Graph, בלי לעבור דרך הקונטיינר — ככה מבדילים בין תקלה אצלנו לתקלה מול מטא. אם זה עובד כאן ולא דרך `/send/text` של הקונטיינר, הבעיה אצלנו.\n\n**חלון 24 השעות**: הודעה חופשית מותרת רק תוך 24 שעות מההודעה האחרונה של הלקוח. מחוץ לחלון מטא מחזירה 131047, ואז רק תבנית (תיקייה 2) תעבוד.\n\n⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.",
+      "item": [
+        {
+          "name": "3.1 · טקסט",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}/messages",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}",
+                "messages"
+              ]
+            },
+            "description": "⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.\n\nעובד רק בתוך חלון 24 השעות. מחוץ לו מטא תחזיר 131047.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{to_number}}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": \"בדיקה ישירה מול Graph\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const id = ((j.messages || [])[0] || {}).id;",
+                  "pm.test('returns a wamid', () => pm.expect(id).to.be.a('string'));",
+                  "pm.collectionVariables.set('last_wamid', id);",
+                  "console.log('wamid:', id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2 · כפתורים",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}/messages",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}",
+                "messages"
+              ]
+            },
+            "description": "⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.\n\nעד 3 כפתורים, 20 תווים לכותרת. ה-id חוזר כ-buttonId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{to_number}}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"button\",\n    \"body\": {\n      \"text\": \"לאשר את הפגישה?\"\n    },\n    \"footer\": {\n      \"text\": \"מרפאת מיכל\"\n    },\n    \"action\": {\n      \"buttons\": [\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"btn_1\",\n            \"title\": \"אישור\"\n          }\n        },\n        {\n          \"type\": \"reply\",\n          \"reply\": {\n            \"id\": \"btn_2\",\n            \"title\": \"ביטול\"\n          }\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "// 131047 = מחוץ לחלון 24 השעות. interactive אסור ביוזמת העסק."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3 · רשימה",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}/messages",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}",
+                "messages"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{to_number}}\",\n  \"type\": \"interactive\",\n  \"interactive\": {\n    \"type\": \"list\",\n    \"header\": {\n      \"type\": \"text\",\n      \"text\": \"תפריט\"\n    },\n    \"body\": {\n      \"text\": \"במה אפשר לעזור?\"\n    },\n    \"action\": {\n      \"button\": \"בחר אפשרות\",\n      \"sections\": [\n        {\n          \"title\": \"שירות\",\n          \"rows\": [\n            {\n              \"id\": \"row_ordering\",\n              \"title\": \"הזמנות\",\n              \"description\": \"מעקב אחרי הזמנה\"\n            },\n            {\n              \"id\": \"row_support\",\n              \"title\": \"תמיכה\",\n              \"description\": \"בעיה טכנית\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "⚠️ **שולח הודעה אמיתית.** עם טוקן אמיתי זה מגיע לטלפון של `{{to_number}}` ונחשב לשיחה פעילה מול מטא.\n\n"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "// ה-id של השורה חוזר כ-selectedId. כותרת עד 24 תווים, תיאור עד 72."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.4 · סימון כנקרא",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}/messages",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}",
+                "messages"
+              ]
+            },
+            "description": "דורש `last_inbound_wamid` — ה-messageId של הודעה **נכנסת**.\n\nמלא last_inbound_wamid ממזהה של הודעה נכנסת אמיתית.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"messaging_product\": \"whatsapp\",\n  \"status\": \"read\",\n  \"message_id\": \"{{last_inbound_wamid}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// דילוג נקי כשהמשתנה לא מולא, כדי ש-Run collection לא ייפול על זה",
+                  "const v = pm.environment.get('last_inbound_wamid') || pm.collectionVariables.get('last_inbound_wamid');",
+                  "if (!v) {",
+                  "  console.warn('דולג — אין last_inbound_wamid. הרץ קודם הודעה נכנסת אמיתית.');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5 · מדיה — כתובת זמנית",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{media_id}}",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{media_id}}"
+              ]
+            },
+            "description": "השלב הראשון ב-/media/{id} של הקונטיינר."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// דילוג נקי כשהמשתנה לא מולא, כדי ש-Run collection לא ייפול על זה",
+                  "const v = pm.environment.get('media_id') || pm.collectionVariables.get('media_id');",
+                  "if (!v) {",
+                  "  console.warn('דולג — אין media_id. קח אחד מהודעת מדיה נכנסת.');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// מטא מחזירה 200 עם גוף תקין, או שגיאה עם error.code ו-error.message.",
+                  "const j = pm.response.json();",
+                  "if (j.error) {",
+                  "  console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "}",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "console.log('mime:', j.mime_type, '| bytes:', j.file_size);",
+                  "pm.collectionVariables.set('media_download_url', j.url);",
+                  "// ה-url תקף ~5 דקות ודורש את אותו Bearer בהורדה."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.6 · מדיה — הקובץ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{media_download_url}}",
+              "host": [
+                "{{media_download_url}}"
+              ]
+            },
+            "description": "הורדה בפועל. הרץ מיד אחרי הקריאה הקודמת — ה-url פג מהר."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// דילוג נקי כשהמשתנה לא מולא, כדי ש-Run collection לא ייפול על זה",
+                  "const v = pm.environment.get('media_download_url') || pm.collectionVariables.get('media_download_url');",
+                  "if (!v) {",
+                  "  console.warn('דולג — הרץ קודם את 3.5.');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "console.log('content-type:', pm.response.headers.get('content-type'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · הודעת דמו ל-whqueue (smoke)",
+      "description": "**כאן Postman מחליף את מטא.** הבקשות חתומות ב-`X-Hub-Signature-256` עם `app_secret`, בדיוק כמו שמטא חותמת, ולכן whqueue לא מבדיל.\n\nהרץ את התיקייה כולה (Run folder): 4.1 שומר את המונים של הקונטיינר, 4.2 מזריק, 4.3 מאמת שהמונים זזו. זו אותה טענה שה-`--inject` של `tests/smoke_v3.py` בודק — ההוכחה היא שההודעה הגיעה ל-Manager, לא שקוד התשובה היה 200.\n\n4.4–4.8 הן וריאציות: כפתור, רשימה, סטטוס, אירוע WABA שמתעלמים ממנו, ומספר לא מוכר.\n\n**זו הודעה אמיתית במערכת שלנו**: היא תיווצר ב-`messages` ויכולה להפעיל תרחיש. השולח הוא `{{from_number}}` וה-messageId מתחיל ב-`wamid.POSTMAN.`.\n\n`app_secret` ריק → 401 על כל בקשה כאן.",
+      "item": [
+        {
+          "name": "4.1 · snapshot — המונים של הקונטיינר לפני",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/health",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "שומר את `inbound.received` ו-`inbound.reported` כדי שהבקשה שאחרי ההזרקה תוכל להשוות. זה מה ש-`smoke_v3.py` עושה: ההוכחה שההודעה הגיעה היא שהמונה זז, לא שקוד התשובה היה 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const h = pm.response.json();",
+                  "pm.collectionVariables.set('inbound_before', h.inbound.received);",
+                  "pm.collectionVariables.set('reported_before', h.inbound.reported);",
+                  "console.log('before — received:', h.inbound.received, '· reported:', h.inbound.reported);",
+                  "pm.test('הקונטיינר מחובר ל-NATS', () => pm.expect(h.nats_connected).to.be.true);",
+                  "if (!h.nats_connected) console.error('בלי NATS ההודעה תישאר בתור ולא תיצרך');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.2 · inject — הודעת טקסט",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "המסלול המלא: חתימה → publish → הקונטיינר של אותו מספר → Manager.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח. הגוף נשלח כ-",
+                  "// {{body_json}} כדי שהבייטים יהיו זהים לחלוטין — כל תו הפרש = 401.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = {",
+                  "  messaging_product: 'whatsapp',",
+                  "  metadata: { display_phone_number: V('display_number'),",
+                  "              phone_number_id:      V('phone_number_id') },",
+                  "  contacts: [{ profile: { name: 'Postman' }, wa_id: V('from_number') }],",
+                  "  messages: [{",
+                  "    type: 'text', text: { body: 'בדיקה מ-Postman' },",
+                  "    from: V('from_number'), id: 'wamid.POSTMAN.' + Date.now(), timestamp: now",
+                  "  }]",
+                  "};",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נותב למספר אחד', () => pm.expect(j.routed).to.eql(1));",
+                  "pm.test('שום דבר לא נזרק', () => pm.expect(j.unrouted + j.dropped).to.eql(0));",
+                  "// מכאן ההודעה על wa.in.{phone_number_id} וממתינה ל-ack של הקונטיינר."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.3 · verify — המונים זזו",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/health",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "**זו הבדיקה שקובעת.** אם `received` לא זז — הקונטיינר לא צרך. אם `received` זז ו-`reported` לא — הוא צרך ונכשל בדיווח ל-Manager, וההודעה לא קיבלה ack ותימסר שוב.\n\nהסקריפט מנסה עד 20 פעם (2 שניות בין נסיונות), כי הצריכה אסינכרונית. ב-Runner זה עובד; בלחיצה בודדת פשוט לחץ שוב."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// הצריכה אסינכרונית, ובשני שלבים: הקונטיינר מושך מ-NATS (received++) ורק",
+                  "// אחר כך מדווח ל-Manager (reported++). מחכים ל-**reported**, אחרת אתה",
+                  "// מתפוס את הרגע שבין השניים — reported הוא זה שמוכיח שהמסלול שלם.",
+                  "const before   = Number(pm.collectionVariables.get('inbound_before'));",
+                  "const reported = Number(pm.collectionVariables.get('reported_before'));",
+                  "const h = pm.response.json();",
+                  "const tries = Number(pm.collectionVariables.get('verify_tries') || 0);",
+                  "",
+                  "const again = () => {",
+                  "  try { pm.execution.setNextRequest(pm.info.requestName); }",
+                  "  catch (e) { postman.setNextRequest(pm.info.requestName); }",
+                  "};",
+                  "",
+                  "const done = h.inbound.reported > reported || h.inbound.failed > 0;",
+                  "",
+                  "if (!done && tries < 20) {",
+                  "  pm.collectionVariables.set('verify_tries', tries + 1);",
+                  "  console.log(`ממתין (${tries + 1}/20) — received ${h.inbound.received}, reported ${h.inbound.reported}`);",
+                  "  again();",
+                  "} else {",
+                  "  pm.collectionVariables.unset('verify_tries');",
+                  "  console.log('after — received:', h.inbound.received, '· reported:', h.inbound.reported);",
+                  "  pm.test('הקונטיינר צרך את ההודעה',",
+                  "    () => pm.expect(h.inbound.received).to.be.above(before));",
+                  "  pm.test('והקונטיינר דיווח ל-Manager',",
+                  "    () => pm.expect(h.inbound.reported).to.be.above(reported));",
+                  "  if (h.inbound.failed) console.error('failed =', h.inbound.failed,",
+                  "    '— הקונטיינר צרך אבל ה-Manager לא ענה. ההודעה לא קיבלה ack ותימסר שוב.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.4 · inject — לחיצת כפתור",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "אמור להגיע ל-Manager כ-type=button_reply עם data.buttonId — בדיוק כמו baileys.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח. הגוף נשלח כ-",
+                  "// {{body_json}} כדי שהבייטים יהיו זהים לחלוטין — כל תו הפרש = 401.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = {",
+                  "  messaging_product: 'whatsapp',",
+                  "  metadata: { display_phone_number: V('display_number'),",
+                  "              phone_number_id:      V('phone_number_id') },",
+                  "  contacts: [{ profile: { name: 'Postman' }, wa_id: V('from_number') }],",
+                  "  messages: [{",
+                  "    type: 'interactive', interactive: { type: 'button_reply',",
+                  "      button_reply: { id: 'btn_yes', title: 'כן' } },",
+                  "    from: V('from_number'), id: 'wamid.POSTMAN.' + Date.now(), timestamp: now",
+                  "  }]",
+                  "};",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נותב למספר אחד', () => pm.expect(j.routed).to.eql(1));",
+                  "pm.test('שום דבר לא נזרק', () => pm.expect(j.unrouted + j.dropped).to.eql(0));",
+                  "// מכאן ההודעה על wa.in.{phone_number_id} וממתינה ל-ack של הקונטיינר."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.5 · inject — בחירה מרשימה",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "type=list_response עם data.selectedId.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח. הגוף נשלח כ-",
+                  "// {{body_json}} כדי שהבייטים יהיו זהים לחלוטין — כל תו הפרש = 401.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = {",
+                  "  messaging_product: 'whatsapp',",
+                  "  metadata: { display_phone_number: V('display_number'),",
+                  "              phone_number_id:      V('phone_number_id') },",
+                  "  contacts: [{ profile: { name: 'Postman' }, wa_id: V('from_number') }],",
+                  "  messages: [{",
+                  "    type: 'interactive', interactive: { type: 'list_reply',",
+                  "      list_reply: { id: 'opt_1', title: 'אפשרות 1' } },",
+                  "    from: V('from_number'), id: 'wamid.POSTMAN.' + Date.now(), timestamp: now",
+                  "  }]",
+                  "};",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נותב למספר אחד', () => pm.expect(j.routed).to.eql(1));",
+                  "pm.test('שום דבר לא נזרק', () => pm.expect(j.unrouted + j.dropped).to.eql(0));",
+                  "// מכאן ההודעה על wa.in.{phone_number_id} וממתינה ל-ack של הקונטיינר."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.6 · inject — סטטוס מסירה",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "status מגיע ל-Manager כמספר (delivered=2), כמו ב-baileys.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = {",
+                  "  messaging_product: 'whatsapp',",
+                  "  metadata: { display_phone_number: V('display_number'),",
+                  "              phone_number_id:      V('phone_number_id') },",
+                  "  statuses: [{ id: 'wamid.POSTMAN.' + Date.now(), status: 'delivered',",
+                  "               timestamp: now, recipient_id: V('from_number') }]",
+                  "};",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נותב למספר אחד', () => pm.expect(j.routed).to.eql(1));",
+                  "pm.test('שום דבר לא נזרק', () => pm.expect(j.unrouted + j.dropped).to.eql(0));",
+                  "// מכאן ההודעה על wa.in.{phone_number_id} וממתינה ל-ack של הקונטיינר."
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.7 · inject — אירוע WABA → ignored",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "אירוע ברמת ה-WABA: אין בו `metadata.phone_number_id`, כי תבנית שייכת ל-WABA ולא למספר.\n\n**whqueue מתעלם ממנו בכוונה.** ה-override נקבע על המספר בלבד, ולכן `message_template_status_update` ממשיך ל-webhook של האפליקציה — שם הוא מטופל כבר היום. תבניות שנולדו ב-Business Manager נמצאות ב-polling מול ה-WABA.\n\nאם הוא כן מנותב, מישהו החזיר את ה-subject של התבניות או קבע override על ה-WABA.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח. הגוף נשלח כ-",
+                  "// {{body_json}} כדי שהבייטים יהיו זהים לחלוטין — כל תו הפרש = 401.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = { event: 'APPROVED', message_template_id: Date.now(),",
+                  "  message_template_name: 'postman_check', message_template_language: 'he' };",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'message_template_status_update', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('לא נותב לאף מספר', () => pm.expect(j.routed).to.eql(0));",
+                  "pm.test('נספר כ-ignored', () => pm.expect(j.ignored).to.be.above(0));",
+                  "pm.test('ולא פורסם לתור', () => pm.expect(j.dropped).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4.8 · inject — מספר לא מוכר",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "**חשוב**: התשובה היא 200, לא 404. מטא מגישה מחדש את *כל* ה-batch על כל סטטוס שאינו 2xx, ולכן מספר אחד לא מוכר היה גורם למשלוח חוזר אינסופי של ההודעות של כל השאר. הספירה בגוף התשובה היא מה שמספר את האמת.",
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// X-Hub-Signature-256 מחושב על הגוף המדויק שיישלח. הגוף נשלח כ-",
+                  "// {{body_json}} כדי שהבייטים יהיו זהים לחלוטין — כל תו הפרש = 401.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const value = { messaging_product: 'whatsapp',",
+                  "  metadata: { phone_number_id: '' },",
+                  "  messages: [{ from: V('from_number'), id: 'wamid.POSTMAN.' + Date.now(),",
+                  "    timestamp: now, type: 'text', text: { body: 'no routing key' } }] };",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 ולא 404', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נספר כ-unrouted', () => pm.expect(j.unrouted).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · whqueue — בריאות, רישום, אבטחה",
+      "description": "מה שצריך לעבוד לפני שתיקייה 4 יכולה לעבוד בכלל, וארבע בקשות שחייבות **להיכשל**.",
+      "item": [
+        {
+          "name": "5.1 · /health ציבורי",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "בלי טוקן ניהול מוחזר רק שהשירות חי. זה מה שה-LB בודק."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('role = gateway', () => pm.expect(j.role).to.eql('gateway'));",
+                  "pm.test('בלי טוקן אין מידע פנימי', () => pm.expect(j.nats).to.be.undefined);",
+                  "console.log('version', j.version);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.2 · /health מפורט",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Whqueue-Token",
+                "value": "{{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "המצב הפנימי. שלושת אלה הם מה שקובע אם /register יעבוד."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('מחובר ל-NATS', () => pm.expect(j.nats.connected).to.be.true);",
+                  "pm.test('הנפקה מוגדרת', () => pm.expect(j.issuing).to.be.true);",
+                  "pm.test('DB מחובר', () => pm.expect(j.db).to.be.true);",
+                  "console.log('stats', JSON.stringify(j.stats));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.3 · handshake של מטא",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/wa?hub.mode=subscribe&hub.verify_token={{verify_token}}&hub.challenge=postman-challenge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ],
+              "query": [
+                {
+                  "key": "hub.mode",
+                  "value": "subscribe"
+                },
+                {
+                  "key": "hub.verify_token",
+                  "value": "{{verify_token}}"
+                },
+                {
+                  "key": "hub.challenge",
+                  "value": "postman-challenge"
+                }
+              ]
+            },
+            "description": "מה שמטא מריצה ברגע שקובעים את ה-override. אם זה נכשל — הכתובת לא נשמרת אצל מטא, וזה הכשל הכי שקט בתהליך."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('מחזיר את ה-challenge', () => pm.expect(pm.response.text().trim()).to.eql('postman-challenge'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.4 · verify token שגוי → 403",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/wa?hub.mode=subscribe&hub.verify_token=wrong-token&hub.challenge=postman-challenge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ],
+              "query": [
+                {
+                  "key": "hub.mode",
+                  "value": "subscribe"
+                },
+                {
+                  "key": "hub.verify_token",
+                  "value": "wrong-token"
+                },
+                {
+                  "key": "hub.challenge",
+                  "value": "postman-challenge"
+                }
+              ]
+            },
+            "description": "verify_token הוא של whqueue ומשותף לכל המספרים — יש כתובת אחת."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.5 · register — credentials ל-NATS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Whqueue-Token",
+                "value": "{{phone_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "register"
+              ]
+            },
+            "description": "מה שהקונטיינר עושה בעלייה. ה-phone_number_id וה-waba_id נלקחים **מה-DB** ולא מהבקשה.\n\n404 = הטלפון לא ב-phones או שאינו provider=cloudapi.\n401 = ה-master secret לא תואם בין whqueue ל-Manager.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone_id\": \"{{phone_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// טוקן פר-טלפון: HMAC-SHA256(master, \"v{version}:{phone_id}\")",
+                  "// אותו חישוב בדיוק ב-whqueue וב-DockerService.WhqueuePhoneToken.",
+                  "const V = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "const master = V('master_secret'), ver = V('token_version') || '1';",
+                  "if (!master) console.warn('master_secret ריק — /register יחזיר 401');",
+                  "pm.variables.set('phone_token',",
+                  "  CryptoJS.HmacSHA256('v' + ver + ':' + V('phone_id'), master).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const n = pm.response.json().nats;",
+                  "pm.test('התקבלו JWT ו-seed', () => { pm.expect(n.jwt).to.be.a('string');",
+                  "  pm.expect(n.seed).to.match(/^SU/); });",
+                  "const want = 'wa.in.' + (pm.environment.get('phone_number_id') || (pm.environment.get('phone_number_id') || pm.collectionVariables.get('phone_number_id')));",
+                  "pm.test('ה-subject הוא של המספר הזה', () => pm.expect(n.inbound_subject).to.eql(want));",
+                  "",
+                  "// קריאת ה-claims בלי אימות חתימה — האימות הוא של NATS",
+                  "const b = n.jwt.split('.')[1];",
+                  "const claims = JSON.parse(atob(b.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0, (4 - b.length % 4) % 4)));",
+                  "const left = claims.exp - Math.floor(Date.now()/1000);",
+                  "pm.test('ה-JWT בתוקף', () => pm.expect(left).to.be.above(300));",
+                  "console.log('JWT expires in', Math.round(left/3600), 'hours');",
+                  "const allow = ((claims.nats || {}).sub || {}).allow || [];",
+                  "pm.test('ה-JWT מתיר את ה-subject הנכנס', () => pm.expect(allow).to.include(n.inbound_subject));",
+                  "pm.test('אין subject לתבניות', () => pm.expect(n.template_subject).to.be.undefined);",
+                  "// תבניות נבדקות ב-polling מול ה-WABA. subject כזה = whqueue בגרסה ישנה.",
+                  "pm.test('ולא יותר מזה', () => pm.expect(allow).to.not.include('>'));",
+                  "pm.test('ה-JWT צר', () => pm.expect(allow.length).to.be.at.most(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.6 · טוקן שגוי → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Whqueue-Token",
+                "value": "0000000000000000000000000000000000000000000000000000000000000000"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "register"
+              ]
+            },
+            "description": "טוקן שלא נגזר מה-master. זה כל מה שמפריד קונטיינר מ-credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone_id\": \"{{phone_id}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.7 · זיוף pnid → 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Whqueue-Token",
+                "value": "{{phone_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "register"
+              ]
+            },
+            "description": "קונטיינר שמבקש creds של מספר אחר. ה-DB הוא מקור האמת, ולכן זה נדחה — בלי זה כל שכבת ההרשאות ב-NATS הייתה חסרת משמעות.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone_id\": \"{{phone_id}}\",\n  \"phone_number_id\": \"999000999000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// טוקן פר-טלפון: HMAC-SHA256(master, \"v{version}:{phone_id}\")",
+                  "// אותו חישוב בדיוק ב-whqueue וב-DockerService.WhqueuePhoneToken.",
+                  "const V = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "const master = V('master_secret'), ver = V('token_version') || '1';",
+                  "if (!master) console.warn('master_secret ריק — /register יחזיר 401');",
+                  "pm.variables.set('phone_token',",
+                  "  CryptoJS.HmacSHA256('v' + ver + ':' + V('phone_id'), master).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "console.log(pm.response.json().detail);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.8 · טלפון לא מוכר → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Whqueue-Token",
+                "value": "{{phone_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "register"
+              ]
+            },
+            "description": "phone_id שלא קיים, או שקיים ואינו cloudapi.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone_id\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const V = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "// הטוקן נגזר על ה-phone_id שבגוף, אחרת נקבל 401 ולא 404",
+                  "pm.variables.set('phone_token', CryptoJS.HmacSHA256(",
+                  "  'v' + (V('token_version')||'1') + ':00000000-0000-0000-0000-000000000000',",
+                  "  V('master_secret')).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 או 401', () => pm.expect([404,401]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.9 · חתימה פסולה → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "sha256=deadbeef"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "רק מטא יכולה לחתום. בלי זה כל אחד היה מזריק הודעות למערכת.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"entry\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5.10 · בלי חתימה → 401",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "description": "REQUIRE_SIGNATURE=1 — היעדר הדר אינו פטור.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"entry\":[]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 · ה-override — קביעה ואימות",
+      "description": "תיקייה 1 רק קוראת; כאן קובעים. Run folder מסתיים במצב מאומת.\n\nה-override נקבע על **המספר בלבד**. ה-WABA מקבל מנוי ולא override: אירועיו, ובראשם `message_template_status_update`, נשארים על ה-webhook של האפליקציה, ותבניות נבדקות ב-polling.",
+      "item": [
+        {
+          "name": "6.1 · כפיית הכתובת על המספר",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}"
+              ]
+            },
+            "description": "בדיוק מה ש-_override_phone עושה בקונטיינר. מטא מריצה את ה-hub.challenge מול הכתובת ברגע הזה — כשל כאן הוא כמעט תמיד whqueue שלא עונה, או verify_token שלא תואם ל-WHQUEUE_VERIFY_TOKEN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"webhook_configuration\": {\n    \"override_callback_uri\": \"{{whqueue_base}}/wa\",\n    \"verify_token\": \"{{verify_token}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('override accepted', () => pm.expect(j.success === true || !!j.id).to.be.true);",
+                  "// 200 כאן אומר 'מטא קיבלה', לא 'הכתובת השתנתה'. בקשה 4 היא ההוכחה.",
+                  "if (j.error && String(j.error.message || '').match(/verif/i))",
+                  "  console.error('ה-handshake נכשל — בדוק ש-verify_token זהה ל-WHQUEUE_VERIFY_TOKEN וש-/wa נגיש מהאינטרנט');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.2 · מנוי ל-WABA (בלי override)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{waba_id}}/subscribed_apps",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{waba_id}}",
+                "subscribed_apps"
+              ]
+            },
+            "description": "המנוי הוא התנאי לכך שמטא תשלח משהו בכלל: בלעדיו ההגדרות נכנסות ושום webhook לא נשלח.\n\n**בלי `override_callback_uri` בכוונה.** אירועי ה-WABA — ובראשם `message_template_status_update` — אמורים להישאר על ה-webhook של האפליקציה, שם הם מטופלים כבר היום. תבניות שנולדו ב-Business Manager נמצאות ב-polling מול ה-WABA, לא ב-webhook.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('subscribed', () => pm.expect(j.success === true || !!j.data).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.3 · אימות — הכתובת אכן השתנתה",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}?fields=webhook_configuration",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}"
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "webhook_configuration"
+                }
+              ]
+            },
+            "description": "**זו הבדיקה שקובעת.** קריאה 2 מחזירה 200 גם כשהכתובת לא נכנסה."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const wanted = pm.environment.get('whqueue_base') + '/wa';",
+                  "const cb = (j.webhook_configuration || {}).phone_number || '';",
+                  "console.log('wanted :', wanted);",
+                  "console.log('actual :', cb || '(none)');",
+                  "pm.test('המספר מצביע ל-whqueue', () => pm.expect(cb).to.eql(wanted));",
+                  "pm.test('בלי query string בכתובת', () => pm.expect(cb).to.not.include('?'));",
+                  "pm.test('בלי מזהה בנתיב', () => pm.expect(cb.replace(/\\/+$/,'').endsWith('/wa')).to.be.true);",
+                  "if (cb && cb !== wanted)",
+                  "  console.error('מטא מחזיקה כתובת אחרת. אם היא ריקה — ה-handshake נכשל והכתובת לא נשמרה.');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.4 · /health של הקונטיינר",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/health",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "מה שה-Manager בודק לפני שהוא מכריז על הטלפון כמחובר.\n\n`override_set` הוא תוצאת האימות **האחרון**, לא מצב עכשיו. סחיפה שנוצרה אחרי שהקונטיינר עלה לא תופיע כאן — /webhook-config הוא זה שקורא חי מ-Graph."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const want = (pm.environment.get('whqueue_base') || (pm.environment.get('whqueue_base') || pm.collectionVariables.get('whqueue_base'))) + '/wa';",
+                  "pm.test('מחובר ל-NATS', () => pm.expect(j.nats_connected).to.be.true);",
+                  "pm.test('הטוקן של מטא תקף', () => pm.expect(j.token_ok).to.be.true);",
+                  "pm.test('כתובת ה-callback היא של whqueue', () => pm.expect(j.callback_url).to.eql(want));",
+                  "pm.test('ה-override אומת', () => pm.expect(j.override_set).to.be.true);",
+                  "if (j.override_error) console.error('override:', j.override_error);",
+                  "console.log('inbound', JSON.stringify(j.inbound));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.5 · /webhook-config — מה שמטא מחזיקה",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/webhook-config",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "webhook-config"
+              ]
+            },
+            "description": "**זו הבדיקה שקובעת.** קוראת מ-Graph את ההגדרה של המספר ושל ה-WABA ומשווה לכתובת הרצויה."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "const want = (pm.environment.get('whqueue_base') || (pm.environment.get('whqueue_base') || pm.collectionVariables.get('whqueue_base'))) + '/wa';",
+                  "console.log('wanted:', want);",
+                  "console.log('phone :', j.phone_effective || '(none)');",
+                  "console.log('waba subscribed:', j.waba_subscribed);",
+                  "pm.test('אין בעיות בהגדרה', () => pm.expect(j.problems).to.be.empty);",
+                  "pm.test('המספר מצביע ל-whqueue', () => pm.expect(j.phone_matches).to.be.true);",
+                  "// ה-WABA נבדק על **מנוי**, לא על override: בלי מנוי מטא לא שולחת כלום,",
+                  "// ועם מנוי אירועי ה-WABA הולכים ל-webhook של האפליקציה — וזה הרצוי.",
+                  "pm.test('האפליקציה מנויה ל-WABA', () => pm.expect(j.waba_subscribed).to.not.eql(false));",
+                  "pm.test('בלי query string', () => pm.expect(String(j.phone_effective||'')).to.not.include('?'));",
+                  "pm.test('בלי מזהה בנתיב', () => pm.expect(String(j.phone_effective||'').replace(/\\/+$/,'').endsWith('/wa')).to.be.true);",
+                  "pm.test('ok', () => pm.expect(j.ok).to.be.true);",
+                  "if (!j.ok) console.error('מטא מחזיקה כתובת אחרת — הרץ את הבקשה הבאה');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.6 · כפייה מחדש מהקונטיינר",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/webhook-config/override",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "webhook-config",
+                "override"
+              ]
+            },
+            "description": "כופה את הכתובת שוב, בשתי הרמות, בלי לגעת ב-consumer. זה מה שמריצים כשה-webhook של הלקוח שונה ידנית במטא."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "console.log('callback:', j.callback_url);",
+                  "if (j.skipped) console.warn('דולג:', JSON.stringify(j.skipped));",
+                  "const eff = j.effective || {};",
+                  "pm.test('נכנס במספר', () => pm.expect(eff.phone_matches).to.be.true);",
+                  "pm.test('המנוי ל-WABA קיים', () => pm.expect(eff.waba_subscribed).to.not.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "6.7 · אימות אחרי הכפייה",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{container_url}}/webhook-config",
+              "host": [
+                "{{container_url}}"
+              ],
+              "path": [
+                "webhook-config"
+              ]
+            },
+            "description": "אותה בדיקה, אחרי הכפייה. עכשיו זה חייב להיות ok."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok', () => pm.expect(pm.response.json().ok).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8 · testNat — צפייה ב-NATS",
+      "description": "מזריק ל-whqueue ומאמת ש-testNat קלט, **בלי להפריע לאף טלפון**.\n\nהמספר המתואם: `phone_number_id` כאן = `PHONE_NUMBER_ID` ב-env של testNat. 8.1 מאמת את זה מול `/health` שלו לפני שמזריקים, כי אי-התאמה מייצרת דף ריק שנראה כמו תקלה במקום אחר.\n\n`testnat_url` הוא ה-testNat: `http://<ip של הקונטיינר>:8000`.\n\nב-`MODE=observe` (ברירת המחדל) זה מנוי core — עותק בלבד. הטלפון האמיתי ממשיך לקבל את ההודעות שלו, ולכן אפשר להריץ את זה מול פרודקשן. ב-`MODE=consume` הוא **גונב** — רק לטלפון בדיקה ייעודי.",
+      "item": [
+        {
+          "name": "8.1 · snapshot — testNat לפני",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const h = pm.response.json();",
+                  "pm.collectionVariables.set('testnat_seen_before', h.seen);",
+                  "",
+                  "pm.test('testNat מחובר ל-NATS', () => pm.expect(h.connected).to.be.true);",
+                  "if (h.error) console.error('testNat:', h.error);",
+                  "",
+                  "// **הבדיקה החשובה כאן**: המספר שבו testNat מאזין מול המספר שאנחנו",
+                  "// עומדים להזריק. אי-התאמה = הזרקה שתלך ל-subject אחר, ודף ריק",
+                  "// שנראה כמו תקלה במקום אחר לגמרי.",
+                  "const V = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "// המספר של תיקייה 8 הוא **לא** בהכרח המספר של תיקיות 1–7: שם זה טלפון",
+                  "// פרודקשן, וכאן זה טלפון הבדיקה. testnat_pnid מפריד ביניהם, וכך אפשר",
+                  "// להריץ את כל האוסף ברצף. בלי ערך — נופל חזרה ל-phone_number_id.",
+                  "const PN = V('testnat_pnid') || V('phone_number_id');",
+                  "const pnid = PN;",
+                  "pm.test('המספר מתואם בין Postman ל-testNat', function () {",
+                  "  pm.expect(String(h.phone_number_id), 'PHONE_NUMBER_ID ב-env של testNat')",
+                  "    .to.eql(String(pnid));",
+                  "});",
+                  "if (String(h.phone_number_id) !== String(pnid)) {",
+                  "  console.error('לא מתואם — פוסטמן:', pnid, '· testNat:', h.phone_number_id,",
+                  "                '· subject:', h.subject);",
+                  "}",
+                  "console.log('testNat לפני — seen:', h.seen, '· subject:', h.subject);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{testnat_url}}/health",
+              "host": [
+                "{{testnat_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "8.2 · inject — הודעה ל-whqueue",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// אותו חישוב חתימה כמו בתיקייה 4. הגוף נשלח כ-{{body_json}} כדי",
+                  "// שהבייטים יהיו זהים למה שנחתם — כל תו הפרש = 401.",
+                  "//",
+                  "// phone_number_id הוא **המספר המתואם**: אותו ערך בדיוק שמוגדר",
+                  "// כ-PHONE_NUMBER_ID ב-env של testNat. הוא זה שקובע את ה-subject.",
+                  "const now = Math.floor(Date.now() / 1000).toString();",
+                  "const V   = k => pm.environment.get(k) || pm.collectionVariables.get(k);",
+                  "",
+                  "const wamid = 'wamid.TESTNAT.' + Date.now();",
+                  "pm.collectionVariables.set('testnat_wamid', wamid);",
+                  "",
+                  "// המספר של תיקייה 8 הוא **לא** בהכרח המספר של תיקיות 1–7: שם זה טלפון",
+                  "// פרודקשן, וכאן זה טלפון הבדיקה. testnat_pnid מפריד ביניהם, וכך אפשר",
+                  "// להריץ את כל האוסף ברצף. בלי ערך — נופל חזרה ל-phone_number_id.",
+                  "const PN = V('testnat_pnid') || V('phone_number_id');",
+                  "const pnid = PN;",
+                  "if (!pnid) console.error('phone_number_id ריק — אין לאן לנתב');",
+                  "",
+                  "const value = {",
+                  "  messaging_product: 'whatsapp',",
+                  "  metadata: { display_phone_number: V('display_number'),",
+                  "              phone_number_id:      pnid },",
+                  "  contacts: [{ profile: { name: 'testNat' }, wa_id: V('from_number') }],",
+                  "  messages: [{",
+                  "    type: 'text', text: { body: 'בדיקת testNat ' + new Date().toLocaleTimeString('he-IL') },",
+                  "    from: V('from_number'), id: wamid, timestamp: now",
+                  "  }]",
+                  "};",
+                  "",
+                  "const body = JSON.stringify({",
+                  "  object: 'whatsapp_business_account',",
+                  "  entry: [{ id: V('waba_id'), changes: [{ field: 'messages', value: value }] }]",
+                  "});",
+                  "pm.variables.set('body_json', body);",
+                  "",
+                  "const secret = V('app_secret');",
+                  "if (!secret) console.warn('app_secret ריק — ה-webhook יידחה ב-401');",
+                  "pm.variables.set('hub_signature',",
+                  "  'sha256=' + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('נותב למספר אחד', () => pm.expect(j.routed).to.eql(1));",
+                  "pm.test('שום דבר לא נזרק', () => pm.expect(j.unrouted + j.dropped).to.eql(0));",
+                  "if (j.unrouted) console.error('unrouted — ה-phone_number_id לא קיים ב-phones');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Hub-Signature-256",
+                "value": "{{hub_signature}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/wa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "wa"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{body_json}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "8.3 · verify — testNat ראה אותה",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// ב-observe אין ack ואין דיווח ל-Manager — יש רק seen. הפרסום",
+                  "// והמנוי הם באותו hop, ולכן זה מגיע תוך מילישניות; עדיין חוזרים",
+                  "// כמה פעמים, כי רשת.",
+                  "const before = Number(pm.collectionVariables.get('testnat_seen_before'));",
+                  "const tries  = Number(pm.collectionVariables.get('tn_tries') || 0);",
+                  "const h = pm.response.json();",
+                  "",
+                  "const again = () => {",
+                  "  try { pm.execution.setNextRequest(pm.info.requestName); }",
+                  "  catch (e) { postman.setNextRequest(pm.info.requestName); }",
+                  "};",
+                  "",
+                  "if (h.seen <= before && tries < 10) {",
+                  "  pm.collectionVariables.set('tn_tries', tries + 1);",
+                  "  console.log(`ממתין (${tries + 1}/10) — seen ${h.seen}`);",
+                  "  again();",
+                  "} else {",
+                  "  pm.collectionVariables.unset('tn_tries');",
+                  "  pm.test('testNat קלט את ההודעה', () => pm.expect(h.seen).to.be.above(before));",
+                  "  if (h.seen <= before) {",
+                  "    console.error('testNat לא ראה כלום. שלוש אפשרויות, בסדר הזה:');",
+                  "    console.error('  1. המספר לא מתואם — ראה 8.1');",
+                  "    console.error('  2. testNat לא על whqueue-net — --network whqueue-net');",
+                  "    console.error('  3. MODE=consume וטלפון אמיתי חטף את ההודעה לפניו');",
+                  "  }",
+                  "  console.log('testNat אחרי — seen:', h.seen);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{testnat_url}}/health",
+              "host": [
+                "{{testnat_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "8.4 · מה ה-Manager היה מקבל",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test('יש אירוע', () => pm.expect(d.events.length).to.be.above(0));",
+                  "const e = d.events[0] || {};",
+                  "",
+                  "// זה ה-inbound.py האמיתי מה-image של הטלפון. מה שמודפס כאן הוא",
+                  "// בדיוק ה-payload שה-Manager היה מקבל על ה-webhook שלו.",
+                  "console.log('subject:', e.subject);",
+                  "console.log('מה שה-Manager היה מקבל:\\n' + JSON.stringify(e.mapped, null, 2));",
+                  "",
+                  "const m = (e.mapped || [])[0] || {};",
+                  "",
+                  "// **טרי, לא מריצה קודמת**: /events שומר היסטוריה, ולכן בלי ההשוואה הזו",
+                  "// הרצה שבה testNat לא קלט כלום הייתה עוברת על אירוע ישן.",
+                  "pm.test('זו ההודעה שהרגע הוזרקה', function () {",
+                  "  pm.expect(m.messageId).to.eql(pm.collectionVariables.get('testnat_wamid'));",
+                  "});",
+                  "pm.test('המיפוי הצליח', () => pm.expect(m.error).to.be.undefined);",
+                  "pm.test('זו הודעה נכנסת', () => pm.expect(m.event).to.eql('message'));",
+                  "pm.test('עם jid בפורמט של baileys', function () {",
+                  "  pm.expect(String(m.jid || (m.data && m.data.jid) || '')).to.include('@s.whatsapp.net');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{testnat_url}}/events",
+              "host": [
+                "{{testnat_url}}"
+              ],
+              "path": [
+                "events"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7 · גלגול אחורה",
+      "description": "**לא חלק מהבדיקה.** מריצים רק כשמחזירים מספר ל-baileys או מורידים WABA. אחרי 7.1 ההודעות של המספר מפסיקות להגיע ל-whqueue.",
+      "item": [
+        {
+          "name": "7.1 · ביטול ה-override",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{phone_number_id}}",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{phone_number_id}}"
+              ]
+            },
+            "description": "מחזיר את המספר ל-webhook של האפליקציה. להשתמש בזה כשמחזירים מספר ל-baileys — לא בפעילות רגילה.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"webhook_configuration\": {\n    \"override_callback_uri\": \"\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// התיקייה הזו הורסת את ההגדרה בכוונה, ולכן היא מדלגת על עצמה ב-Run",
+                  "// collection. בלי זה כל ריצה מלאה הייתה מסתיימת בניתוק המספר מ-whqueue,",
+                  "// והריצה הבאה הייתה נכשלת בתיקייה 1 בלי סיבה נראית לעין.",
+                  "const allow = pm.environment.get('allow_rollback') || pm.collectionVariables.get('allow_rollback');",
+                  "if (String(allow) !== '1') {",
+                  "  console.warn('דולג — קבע allow_rollback=1 ב-environment כדי לגלגל אחורה');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "console.log('חזר ל-webhook של האפליקציה');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7.2 · הסרת המנוי ל-WABA",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{graph}}/{{waba_id}}/subscribed_apps",
+              "host": [
+                "{{graph}}"
+              ],
+              "path": [
+                "{{waba_id}}",
+                "subscribed_apps"
+              ]
+            },
+            "description": "עוצר כל webhook מה-WABA הזה. הרץ רק כשמורידים את ה-WABA מהמערכת.\n\nזה מסיר את המנוי כולו — כל webhook מה-WABA נעצר, גם אישורי תבניות."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// התיקייה הזו הורסת את ההגדרה בכוונה, ולכן היא מדלגת על עצמה ב-Run",
+                  "// collection. בלי זה כל ריצה מלאה הייתה מסתיימת בניתוק המספר מ-whqueue,",
+                  "// והריצה הבאה הייתה נכשלת בתיקייה 1 בלי סיבה נראית לעין.",
+                  "const allow = pm.environment.get('allow_rollback') || pm.collectionVariables.get('allow_rollback');",
+                  "if (String(allow) !== '1') {",
+                  "  console.warn('דולג — קבע allow_rollback=1 ב-environment כדי לגלגל אחורה');",
+                  "  try { pm.execution.skipRequest(); } catch (e) { }",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.error) console.error('Graph error', j.error.code, j.error.error_subcode || '', j.error.message);",
+                  "pm.test('200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
